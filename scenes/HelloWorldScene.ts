@@ -77,6 +77,8 @@ export default class HelloWorldScene extends Phaser.Scene {
 
     // Path finder
     this.finder = new EasyStar.js();
+    this.finder.enableDiagonals();
+    this.finder.disableCornerCutting();
 
     // Create 2D representation of map for pathfinder
     const grid = [];
@@ -120,17 +122,28 @@ export default class HelloWorldScene extends Phaser.Scene {
   };
 
   moveChar(path) {
+    const dist = (x1, y1, x2, y2) => {
+      return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+    };
+    const speed = 7;
     const tweens = [];
     for (let i = 0; i < path.length - 1; i++) {
       const ex = path[i + 1].x;
       const ey = path[i + 1].y;
+
+      const curx = path[i].x;
+      const cury = path[i].y;
+      const distance = dist(curx, cury, ex, ey);
+      const duration = (distance / speed) * 1000;
+
       tweens.push({
         targets: this.ship,
-        x: { value: ex * TILE_SIZE, duration: 200 },
-        y: { value: ey * TILE_SIZE, duration: 200 }
+        x: { value: ex * TILE_SIZE, duration },
+        y: { value: ey * TILE_SIZE, duration }
       });
     }
 
+    this.tweens.killAll();
     this.tweens.timeline({
       tweens: tweens
     });
