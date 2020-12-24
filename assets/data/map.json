@@ -416,6 +416,9 @@
       "tilecount": 140,
       "tileheight": 32,
       "tileproperties": {
+        "20": {
+          "collide": true
+        },
         "103": {
           "collide": true
         },
@@ -445,6 +448,9 @@
         }
       },
       "tilepropertytypes": {
+        "20": {
+          "collide": "bool"
+        },
         "103": {
           "collide": "bool"
         },
