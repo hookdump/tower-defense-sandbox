@@ -1,11 +1,13 @@
 import Phaser, { Game } from "phaser";
 import EasyStar from "easystarjs";
-import { TILE_SIZE, SCREEN_H } from "../constants";
+import { TILE_SIZE, SCREEN_H, SCREEN_W } from "../constants";
 
 export default class HelloWorldScene extends Phaser.Scene {
+  that = this;
   map: Phaser.Tilemaps.Tilemap;
   marker: Phaser.GameObjects.Graphics;
   finder: EasyStar.js;
+  ship: Phaser.Physics.Arcade.Image;
 
   constructor() {
     super("hello-world");
@@ -28,6 +30,28 @@ export default class HelloWorldScene extends Phaser.Scene {
 
   create() {
     // this.add.image(400, 300, "background");
+
+    this.input.on("pointerup", (pointer) => {
+      const round = (v) => Math.floor(v / TILE_SIZE);
+      const x = pointer.x;
+      const y = pointer.y;
+      const toX = round(x);
+      const toY = round(y);
+      const fromX = round(this.ship.x);
+      const fromY = round(this.ship.y);
+
+      console.log(fromX, fromY, toX, toY);
+      console.log("Finding...");
+      this.finder.findPath(fromX, fromY, toX, toY, (path) => {
+        if (path === null) {
+          console.warn("Path not found!");
+        } else {
+          console.log(path);
+          this.moveChar(path);
+        }
+      });
+      this.finder.calculate();
+    });
 
     // Display map
     this.map = this.make.tilemap({ key: "map" });
@@ -81,13 +105,35 @@ export default class HelloWorldScene extends Phaser.Scene {
     }
     this.finder.setAcceptableTiles(walkableTiles);
 
-    const ship = this.physics.add.image(400, 100, "ship");
-    ship.setVelocity(0, 200);
-    ship.setBounce(1, 1);
-    ship.setCollideWorldBounds(true);
-    this.physics.add.collider(ship, tileLayer);
+    this.ship = this.physics.add.image(32, 32, "ship");
+    this.ship.setOrigin(0, 0);
+    this.ship.setVelocity(0, 0);
+    this.ship.setBounce(1, 1);
+    this.ship.setCollideWorldBounds(true);
+    this.physics.add.collider(this.ship, tileLayer);
 
     // emitter.startFollow(ship);
+  }
+
+  handleClick = (pointer) => {
+    console.log("Test", this);
+  };
+
+  moveChar(path) {
+    const tweens = [];
+    for (let i = 0; i < path.length - 1; i++) {
+      const ex = path[i + 1].x;
+      const ey = path[i + 1].y;
+      tweens.push({
+        targets: this.ship,
+        x: { value: ex * TILE_SIZE, duration: 200 },
+        y: { value: ey * TILE_SIZE, duration: 200 }
+      });
+    }
+
+    this.tweens.timeline({
+      tweens: tweens
+    });
   }
 
   update() {
