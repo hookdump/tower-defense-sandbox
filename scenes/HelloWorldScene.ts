@@ -6,11 +6,19 @@ export default class HelloWorldScene extends Phaser.Scene {
   that = this;
   map: Phaser.Tilemaps.Tilemap;
   marker: Phaser.GameObjects.Graphics;
+  attackLines: Phaser.GameObjects.Graphics;
   finder: EasyStar.js;
   ship: Phaser.Physics.Arcade.Image;
+  towers: any;
+  towerTileIds: any;
+  towerLines: any;
+  tileLayer: Phaser.Tilemaps.StaticTilemapLayer;
 
   constructor() {
     super("hello-world");
+    this.towers = [];
+    this.towerTileIds = [];
+    this.towerLines = [];
   }
 
   preload() {
@@ -26,6 +34,24 @@ export default class HelloWorldScene extends Phaser.Scene {
     const splitLine = new Phaser.Geom.Line(0, lineY, 600, lineY);
     graphics.lineStyle(4, 0x2ecc40);
     graphics.strokeLineShape(splitLine);
+  }
+
+  drawAttackLine(line: Phaser.Geom.Line, x1, y1, x2, y2) {
+    line.setTo(x1, y1, x2, y2);
+    this.attackLines.strokeLineShape(line);
+  }
+
+  renderAttacks() {
+    // this.attackLines.clear();
+    this.towers.forEach((tower) => {
+      const { x, y } = tower;
+      if (!tower.line) {
+        console.log("CREANDO LINEA");
+        tower.line = new Phaser.Geom.Line(0, 0, 100, 100);
+      }
+      const { pixelX, pixelY } = this.tileLayer.getTileAt(x, y);
+      this.drawAttackLine(tower.line, pixelX, pixelY, this.ship.x, this.ship.y);
+    });
   }
 
   create() {
@@ -56,10 +82,15 @@ export default class HelloWorldScene extends Phaser.Scene {
     // Display map
     this.map = this.make.tilemap({ key: "map" });
     const tiles = this.map.addTilesetImage("tiles", "tileset");
-    const tileLayer = this.map.createStaticLayer(0, tiles, 0, 0);
-    // tileLayer.setCollisionByExclusion([-1, 20], true);
+    this.tileLayer = this.map.createStaticLayer(0, tiles, 0, 0);
+
+    // this.tileLayer.setCollisionByExclusion([-1, 20], true);
 
     this.renderUI();
+
+    this.attackLines = this.add.graphics();
+    this.attackLines.lineStyle(1, 0x2ecc40);
+    this.renderAttacks();
 
     // Marker following the mouse
     this.marker = this.add.graphics();
@@ -80,18 +111,6 @@ export default class HelloWorldScene extends Phaser.Scene {
     this.finder.enableDiagonals();
     this.finder.disableCornerCutting();
 
-    // Create 2D representation of map for pathfinder
-    const grid = [];
-    for (let y = 0; y < this.map.height; y++) {
-      let col = [];
-      for (let x = 0; x < this.map.width; x++) {
-        const tileId = tileLayer.getTileAt(x, y).index;
-        col.push(tileId);
-      }
-      grid.push(col);
-    }
-    this.finder.setGrid(grid);
-
     // Set up walkable tiles
     const tileset = this.map.tilesets[0];
     const properties = tileset.tileProperties;
@@ -103,16 +122,38 @@ export default class HelloWorldScene extends Phaser.Scene {
         walkableTiles.push(i + 1);
         continue;
       }
-      if (!properties[i].collide) walkableTiles.push(i + 1);
+      // Tile is defined!
+      if (!properties[i].collide) {
+        walkableTiles.push(i + 1);
+      }
+      // If tower!
+      if (properties[i].tower) {
+        this.towerTileIds.push(i + 1);
+      }
     }
     this.finder.setAcceptableTiles(walkableTiles);
+
+    // Create 2D representation of map for pathfinder
+    const grid = [];
+    for (let y = 0; y < this.map.height; y++) {
+      let col = [];
+      for (let x = 0; x < this.map.width; x++) {
+        const tileId = this.tileLayer.getTileAt(x, y).index;
+        if (this.towerTileIds.includes(tileId)) {
+          this.towers.push({ x, y });
+        }
+        col.push(tileId);
+      }
+      grid.push(col);
+    }
+    this.finder.setGrid(grid);
 
     this.ship = this.physics.add.image(32, 32, "ship");
     this.ship.setOrigin(0, 0);
     this.ship.setVelocity(0, 0);
     this.ship.setBounce(1, 1);
     this.ship.setCollideWorldBounds(true);
-    this.physics.add.collider(this.ship, tileLayer);
+    this.physics.add.collider(this.ship, this.tileLayer);
 
     // emitter.startFollow(ship);
   }
@@ -157,6 +198,7 @@ export default class HelloWorldScene extends Phaser.Scene {
     this.marker.x = this.map.tileToWorldX(pointerTileX);
     this.marker.y = this.map.tileToWorldY(pointerTileY);
     this.marker.setVisible(true);
+    this.renderAttacks();
     // this.marker.setVisible(this.checkCollision(pointerTileX, pointerTileY));
   }
 
