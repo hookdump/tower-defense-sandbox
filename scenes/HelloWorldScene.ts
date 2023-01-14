@@ -1,6 +1,7 @@
-import Phaser, { Game } from "phaser";
+import Phaser, { Game, Math as PhaserMath } from "phaser";
 import EasyStar from "easystarjs";
 import { TILE_SIZE, SCREEN_H, SCREEN_W } from "../constants";
+const HALF_TILE = TILE_SIZE / 2;
 
 export default class HelloWorldScene extends Phaser.Scene {
   that = this;
@@ -26,6 +27,7 @@ export default class HelloWorldScene extends Phaser.Scene {
     this.load.tilemapTiledJSON("map", "assets/data/map.json");
     this.load.image("ship", "assets/sprites/ship.png");
     this.load.image("tower", "assets/sprites/tower.png");
+    this.load.image("bullet", "assets/sprites/bullet.png");
   }
 
   renderUI() {
@@ -41,16 +43,72 @@ export default class HelloWorldScene extends Phaser.Scene {
     this.attackLines.strokeLineShape(line);
   }
 
+  distance(x1, y1, x2, y2) {
+    let y = x2 - x1;
+    let x = y2 - y1;
+    return Math.sqrt(x * x + y * y);
+  }
+
+  calcAngle(x1, y1, x2, y2) {
+    let dy = x2 - x1;
+    let dx = y2 - y1;
+    let theta = Math.atan2(dy, dx); // range (-PI, PI]
+    theta *= 180 / Math.PI; // rads to degs, range (-180, 180]
+    if (theta < 0) theta = 360 + theta; // range [0, 360)
+    return theta;
+  }
+
   renderAttacks() {
-    // this.attackLines.clear();
+    this.attackLines.clear();
     this.towers.forEach((tower) => {
       const { x, y } = tower;
       if (!tower.line) {
-        console.log("CREANDO LINEA");
-        tower.line = new Phaser.Geom.Line(0, 0, 100, 100);
+        // console.log("CREANDO LINEA");
+        tower.line = new Phaser.Geom.Line(50, 50, 50, 50);
       }
       const { pixelX, pixelY } = this.tileLayer.getTileAt(x, y);
-      this.drawAttackLine(tower.line, pixelX, pixelY, this.ship.x, this.ship.y);
+
+      if (this.distance(pixelX, pixelY, this.ship.x, this.ship.y) < 200) {
+        /* this.drawAttackLine(
+          tower.line,
+          pixelX + HALF_TILE,
+          pixelY + HALF_TILE,
+          this.ship.x + HALF_TILE,
+          this.ship.y + HALF_TILE
+        );
+        */
+        if (tower.emitter) {
+          // const angle = this.calcAngle(pixelX, pixelY, this.ship.x, this.ship.y);
+          const between = PhaserMath.Angle.Between(
+            pixelX,
+            pixelY,
+            this.ship.x,
+            this.ship.y
+          );
+          const angle = between;
+          const ok = angle * (180 / Math.PI);
+          // const angle = PhaserMath.Angle.Wrap(between);
+          // const angle = PhaserMath.Angle.WrapDegrees(between);
+          // const angle = between * 180;
+          // console.log(normalized);
+          // tower.emitter.startFollow(this.ship);
+          tower.emitter.setAngle(ok);
+          tower.emitter.resume();
+          /*
+          tower.emitter.setDeathZone({
+            source: new Phaser.Geom.Circle(this.ship.x, this.ship.y, 24),
+            type: "onEnter"
+          });
+          */
+          tower.label.setText(parseInt(ok));
+          /* tower.emitter.moveToX = this.ship.x;
+          tower.emitter.moveToY = this.ship.y; */
+        }
+      } else {
+        tower.emitter.killAll();
+        tower.emitter.pause();
+        tower.label.setText("");
+      }
     });
   }
 
@@ -90,21 +148,12 @@ export default class HelloWorldScene extends Phaser.Scene {
 
     this.attackLines = this.add.graphics();
     this.attackLines.lineStyle(1, 0x2ecc40);
-    this.renderAttacks();
+    // this.renderAttacks();
 
     // Marker following the mouse
     this.marker = this.add.graphics();
     this.marker.lineStyle(3, 0xffffff, 1);
     this.marker.strokeRect(0, 0, this.map.tileWidth, this.map.tileHeight);
-
-    /*
-    const particles = this.add.particles("tower");
-    const emitter = particles.createEmitter({
-      speed: 100,
-      scale: { start: 1, end: 0 },
-      blendMode: "ADD"
-    });
-    */
 
     // Path finder
     this.finder = new EasyStar.js();
@@ -140,7 +189,33 @@ export default class HelloWorldScene extends Phaser.Scene {
       for (let x = 0; x < this.map.width; x++) {
         const tileId = this.tileLayer.getTileAt(x, y).index;
         if (this.towerTileIds.includes(tileId)) {
-          this.towers.push({ x, y });
+          const particles = this.add.particles("bullet");
+          const emitter = particles.createEmitter({
+            speed: 500,
+            quantity: 1,
+            lifespan: 300,
+            frequency: 800,
+            scale: { start: 1, end: 0 },
+            blendMode: "MULTIPLY",
+            on: true,
+            x: x * TILE_SIZE + HALF_TILE,
+            y: y * TILE_SIZE + HALF_TILE
+            /*
+            moveToX: 100,
+            moveToY: 100,
+            */
+          });
+          const label = this.add.text(x * TILE_SIZE + 3, y * TILE_SIZE, "", {});
+          label.setFontSize(10);
+
+          const tower = {
+            x,
+            y,
+            type: tileId,
+            emitter,
+            label
+          };
+          this.towers.push(tower);
         }
         col.push(tileId);
       }
