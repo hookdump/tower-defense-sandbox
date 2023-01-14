@@ -1,7 +1,7 @@
 {
-  "name": "tower-defense-sandbox-test",
+  "name": "tower-defense-a",
   "version": "1.0.0",
-  "description": "Drawing platforms",
+  "description": "",
   "main": "index.html",
   "scripts": {
     "start": "parcel index.html --open",
